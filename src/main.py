@@ -1,3 +1,4 @@
+import os
 import sys
 
 from dotenv import load_dotenv
@@ -165,6 +166,21 @@ if __name__ == "__main__":
     parser.add_argument(
         "--show-agent-graph", action="store_true", help="Show the agent graph"
     )
+    parser.add_argument(
+        "--output-file",
+        type=str,
+        help="Write the run result (decisions + analyst_signals + execution_mode) to this JSON path for an agentic execution layer (e.g. Claude Code) to consume.",
+    )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help="Mark this run as intended for live submission via the Robinhood Agentic Trading MCP. This flag does NOT submit orders from Python; it sets execution_mode=live in the output JSON so the CLAUDE.md playbook can branch on it.",
+    )
+    parser.add_argument(
+        "--confirm-per-trade",
+        action="store_true",
+        help="When the agentic execution layer goes live, ask for y/N approval per ticker instead of for the whole batch.",
+    )
 
     args = parser.parse_args()
 
@@ -288,3 +304,17 @@ if __name__ == "__main__":
         model_provider=model_provider,
     )
     print_trading_output(result)
+
+    # Annotate the result with the execution mode so an agentic layer (e.g. Claude
+    # Code with the Robinhood Trading MCP) can decide whether to actually submit
+    # orders. Python never submits orders itself.
+    if args.output_file:
+        result_for_disk = {
+            **result,
+            "execution_mode": "live" if args.live else "dry_run",
+            "confirm_per_trade": bool(args.confirm_per_trade),
+            "live_trading_env_allowed": os.environ.get("HEDGE_FUND_LIVE_TRADING_ALLOWED", "").lower() == "true",
+        }
+        with open(args.output_file, "w") as f:
+            json.dump(result_for_disk, f, indent=2, default=str)
+        print(f"\nWrote run result to {args.output_file} (execution_mode={result_for_disk['execution_mode']})")

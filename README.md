@@ -1,5 +1,16 @@
 # AI Hedge Fund
 
+> ⚠️ **This repo is wired up for live trading via Robinhood Agentic Trading.**
+> Once you've registered Robinhood's Agentic Trading MCP server with your
+> local Claude Code (see [Live trading](#live-trading-via-robinhood-agentic-trading)
+> below), a Claude Code session in this repo can place real equity orders.
+> Read [`CLAUDE.md`](./CLAUDE.md) before doing anything with `--live`. The
+> default mode is dry-run; live mode additionally requires
+> `HEDGE_FUND_LIVE_TRADING_ALLOWED=true` in your environment. **You are
+> solely responsible for any orders placed.** The educational-use disclaimer
+> below still applies — running with `--live` is your decision, not the
+> project's recommendation.
+
 This is a proof of concept for an AI-powered hedge fund.  The goal of this project is to explore the use of AI to make trading decisions.  This project is for **educational** purposes only and is not intended for real trading or investment.
 
 This system employs several agents working together:
@@ -44,6 +55,7 @@ By using this software, you agree to use it solely for learning purposes.
 - [Usage](#usage)
   - [Running the Hedge Fund](#running-the-hedge-fund)
   - [Running the Backtester](#running-the-backtester)
+  - [Live trading via Robinhood Agentic Trading](#live-trading-via-robinhood-agentic-trading)
 - [Project Structure](#project-structure)
 - [Contributing](#contributing)
 - [Feature Requests](#feature-requests)
@@ -129,6 +141,49 @@ You can optionally specify the start and end dates to backtest over a specific t
 ```bash
 poetry run python src/backtester.py --ticker AAPL,MSFT,NVDA --start-date 2024-01-01 --end-date 2024-03-01
 ```
+
+### Live trading via Robinhood Agentic Trading
+
+This repo can execute the portfolio manager's decisions against a real
+Robinhood Agentic Trading account. The integration is intentionally
+lightweight: **Python only emits decisions; a Claude Code session in this
+repo handles execution via Robinhood's MCP server.**
+
+Setup (one-time):
+
+1. Install Claude Code: <https://claude.com/claude-code>.
+2. Get the Robinhood Agentic Trading MCP endpoint from Robinhood
+   (their Agentic Trading docs / account dashboard) and register it with
+   Claude Code under the name `robinhood-trading`:
+   ```bash
+   claude mcp add robinhood-trading --transport http <robinhood-mcp-url>
+   ```
+   On first invocation, your browser will open Robinhood's OAuth flow —
+   sign in and authorize a dedicated Agentic Trading account.
+3. Add a defense-in-depth gate to your environment:
+   ```
+   export HEDGE_FUND_LIVE_TRADING_ALLOWED=true
+   ```
+   `CLAUDE.md` refuses to submit any live order unless this is set, even
+   when `--live` is passed.
+
+Daily flow:
+
+```bash
+# Dry run — emits decisions, never calls the broker.
+poetry run python src/main.py --tickers AAPL,MSFT --output-file decisions.json
+
+# Live run — same decisions, but execution_mode=live in the output JSON.
+poetry run python src/main.py --tickers AAPL,MSFT --output-file decisions.json --live --confirm-per-trade
+```
+
+Then, in a Claude Code session at the repo root, ask Claude to execute the
+run. Claude will read `decisions.json`, show you a summary table, and — only
+if the gates are clear — ask for `y/N` and call the `robinhood-trading` MCP
+tools. The full execution contract is documented in [`CLAUDE.md`](./CLAUDE.md);
+read it before going live. Submissions are appended to `trades.log` for
+auditing. Robinhood Agentic Trading is currently equities-only in beta;
+options, crypto, and futures are not supported.
 
 ## Project Structure 
 ```

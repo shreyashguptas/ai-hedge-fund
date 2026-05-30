@@ -46,3 +46,8 @@ Thumbs.db
 
 # Txt files
 *.txt
+
+# Hedge fund run artifacts
+decisions.json
+*.decisions.json
+trades.log
